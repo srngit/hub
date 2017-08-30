@@ -15,8 +15,6 @@ import com.flightstats.hub.util.TimeUtil;
 import com.google.common.base.Optional;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.joda.time.DateTime;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.concurrent.*;
@@ -25,7 +23,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 class SingleWebhookStrategy implements WebhookStrategy {
 
-    private final static Logger logger = LoggerFactory.getLogger(SingleWebhookStrategy.class);
     private static final ObjectMapper mapper = HubProvider.getInstance(ObjectMapper.class);
     private final Webhook webhook;
     private final LastContentPath lastContentPath;
@@ -127,6 +124,7 @@ class SingleWebhookStrategy implements WebhookStrategy {
                     if (!channelConfig.isLive()) {
                         latestStableInChannel = channelService.getLastUpdated(channel, MinutePath.NONE).getTime();
                     }
+                    if (WebhookStrategy.pastEndtimeThreshold(webhook, latestStableInChannel)) return false;
                     TimeQuery timeQuery = queryGenerator.getQuery(latestStableInChannel);
                     if (timeQuery != null) {
                         addKeys(channelService.queryByTime(timeQuery));

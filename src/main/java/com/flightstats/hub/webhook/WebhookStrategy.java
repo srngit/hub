@@ -1,6 +1,7 @@
 package com.flightstats.hub.webhook;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.flightstats.hub.app.HubProvider;
 import com.flightstats.hub.cluster.LastContentPath;
 import com.flightstats.hub.dao.ChannelService;
 import com.flightstats.hub.model.ContentKey;
@@ -9,6 +10,9 @@ import com.flightstats.hub.model.MinutePath;
 import com.flightstats.hub.model.SecondPath;
 import com.flightstats.hub.util.TimeUtil;
 import com.google.common.base.Optional;
+import org.joda.time.DateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -27,6 +31,9 @@ interface WebhookStrategy extends AutoCloseable {
     ObjectNode createResponse(ContentPath contentPath);
 
     ContentPath inProcess(ContentPath contentPath);
+
+    final static WebhookService webhookService = HubProvider.getInstance(WebhookService.class);
+    final static Logger logger = LoggerFactory.getLogger(SingleWebhookStrategy.class);
 
     static ContentPath createContentPath(Webhook webhook) {
         if (webhook.isSecond()) {
@@ -56,4 +63,18 @@ interface WebhookStrategy extends AutoCloseable {
             queue.clear();
         }
     }
+
+    static boolean pastEndtimeThreshold(Webhook webhook, DateTime current) {
+        if (webhook.getEndItem() != null) {
+            DateTime endTime = ContentPath.fromFullUrl(webhook.getEndItem()).get().getTime();
+            if (current.compareTo(endTime) >= 0) {
+                logger.info("Bracketed Webhook " + webhook.getName() + " complete at time: " + current);
+                webhookService.delete(webhook.getName());
+                return true;
+            }
+        }
+        return false;
+    }
+
+    ;
 }

@@ -95,6 +95,7 @@ public class WebhookResource {
         root.put("heartbeat", webhook.isHeartbeat());
         root.put("ttlMinutes", webhook.getTtlMinutes());
         root.put("maxWaitMinutes", webhook.getMaxWaitMinutes());
+        root.put("endItem", webhook.getEndItem() != null ? webhook.getEndItem() : "");
         root.put("callbackTimeoutSeconds", webhook.getCallbackTimeoutSeconds());
         addLatest(webhook, status, root, true);
         TimeLinkUtil.addTime(root, stable, "stableTime");

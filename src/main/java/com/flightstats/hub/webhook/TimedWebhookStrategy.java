@@ -184,6 +184,8 @@ class TimedWebhookStrategy implements WebhookStrategy {
                     }
                     logger.debug("replicating {} stable {}", contentPath, stable);
                 }
+                if (WebhookStrategy.pastEndtimeThreshold(webhook, nextTime)) return;
+
                 logger.debug("lastAdded {} nextTime {} stable {}", lastAdded, nextTime, stable);
                 while (nextTime.isBefore(stable)) {
                     try {
