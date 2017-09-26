@@ -7,10 +7,7 @@ import com.flightstats.hub.app.HubProperties;
 import com.flightstats.hub.app.HubProvider;
 import com.flightstats.hub.dao.ChannelService;
 import com.flightstats.hub.exception.InvalidRequestException;
-import com.flightstats.hub.model.ContentKey;
-import com.flightstats.hub.model.ContentPath;
-import com.flightstats.hub.model.DirectionQuery;
-import com.flightstats.hub.model.NamedType;
+import com.flightstats.hub.model.*;
 import com.flightstats.hub.util.RequestUtils;
 import com.google.common.base.Optional;
 import com.google.gson.Gson;
@@ -43,16 +40,17 @@ public class Webhook implements Comparable<Webhook>, NamedType {
     private final Integer maxWaitMinutes;
     private final Integer callbackTimeoutSeconds;
     private final boolean fastForwardable;
-    private final String endItem;  // FIXME problem - shouldn't be saved as ContentPath, but as string
+    private final String tag;  // webhooks with tag defined are prototype webhook definitions
+    private final boolean managedByTag; // webhooks with this bit set were created by a tag prototype and will be automatically
+    // created and deleted when a channel has the webhook "tag" added or removed.
 
-    @java.beans.ConstructorProperties({"callbackUrl", "channelUrl", "parallelCalls", "name", "startingKey", "batch", "heartbeat", "paused", "ttlMinutes", "maxWaitMinutes", "callbackTimeoutSeconds", "endItem"})
-    private Webhook(String callbackUrl, String channelUrl, Integer parallelCalls, String name, ContentPath startingKey, String batch, boolean heartbeat, boolean paused, Integer ttlMinutes, Integer maxWaitMinutes, Integer callbackTimeoutSeconds, boolean fastForwardable, String endItem) {
+    @java.beans.ConstructorProperties({"callbackUrl", "channelUrl", "parallelCalls", "name", "startingKey", "batch", "heartbeat", "paused", "ttlMinutes", "maxWaitMinutes", "callbackTimeoutSeconds"})
+    private Webhook(String callbackUrl, String channelUrl, Integer parallelCalls, String name, ContentPath startingKey, String batch, boolean heartbeat, boolean paused, Integer ttlMinutes, Integer maxWaitMinutes, Integer callbackTimeoutSeconds, boolean fastForwardable, String tag, boolean managedByTag) {
         this.callbackUrl = callbackUrl;
         this.channelUrl = channelUrl;
         this.parallelCalls = parallelCalls;
         this.name = name;
         this.startingKey = startingKey;
-        this.endItem = endItem;
         this.batch = batch;
         this.heartbeat = heartbeat;
         this.paused = paused;
@@ -60,6 +58,8 @@ public class Webhook implements Comparable<Webhook>, NamedType {
         this.maxWaitMinutes = maxWaitMinutes;
         this.callbackTimeoutSeconds = callbackTimeoutSeconds;
         this.fastForwardable = fastForwardable;
+        this.tag = tag;
+        this.managedByTag = managedByTag;
     }
 
     public static Webhook fromJson(String json, Optional<Webhook> webhookOptional) {
@@ -72,23 +72,17 @@ public class Webhook implements Comparable<Webhook>, NamedType {
                     .channelUrl(existing.channelUrl)
                     .name(existing.name)
                     .startingKey(existing.startingKey)
-                    .endItem(existing.endItem)
                     .batch(existing.batch)
                     .ttlMinutes(existing.ttlMinutes)
                     .maxWaitMinutes(existing.maxWaitMinutes)
                     .callbackTimeoutSeconds(existing.callbackTimeoutSeconds)
                     .heartbeat(existing.heartbeat)
-                    .fastForwardable(existing.fastForwardable);
+                    .fastForwardable(existing.fastForwardable)
+                    .tag(existing.tag)
+                    .managedByTag(existing.managedByTag);
         }
         try {
             JsonNode root = mapper.readTree(json);
-            if (root.has("endItem")) {
-                String endItem = root.get("endItem").asText();
-                Optional<ContentPath> keyOptional = ContentPath.fromFullUrl(endItem);
-                if (keyOptional.isPresent()) {
-                    builder.endItem(endItem);
-                }
-            }
             if (root.has("startItem")) {
                 Optional<ContentPath> keyOptional = Optional.absent();
                 String startItem = root.get("startItem").asText();
@@ -139,11 +133,22 @@ public class Webhook implements Comparable<Webhook>, NamedType {
             if (root.has("fastForwardable")) {
                 builder.fastForwardable(root.get("fastForwardable").asBoolean());
             }
+            if (root.has("tag")) {
+                builder.tag(root.get("tag").asText());
+            }
+            if (root.has("managedByTag")) {
+                builder.managedByTag(root.get("managedByTag").asBoolean());
+            }
         } catch (IOException e) {
             logger.warn("unable to parse json" + json, e);
             throw new InvalidRequestException(e.getMessage());
         }
         return builder.build();
+    }
+
+    @JsonIgnore
+    public boolean isTagPrototype() {
+        return tag != null && !tag.isEmpty() && !isManagedByTag();
     }
 
     private static Optional<ContentPath> getPrevious(Optional<ContentPath> keyOptional, String channelUrl) {
@@ -167,6 +172,13 @@ public class Webhook implements Comparable<Webhook>, NamedType {
         return keyOptional;
     }
 
+    public static Webhook instanceFromTagPrototype(Webhook whp, ChannelConfig channel) {
+        String channenUrl = whp.getChannelUrl() + "/channel/" + channel.getName();
+        String whName = "TAGWH_" + whp.getTag() + "_" + channel.getName();
+        Webhook instance = new Webhook(whp.callbackUrl, channenUrl, whp.parallelCalls, whName, null, whp.batch, whp.heartbeat, whp.paused, whp.ttlMinutes, whp.maxWaitMinutes, whp.callbackTimeoutSeconds, whp.fastForwardable, whp.tag, true);
+        return instance;
+    }
+
     public static Webhook fromJson(String json) {
         return fromJson(json, Optional.absent());
     }
@@ -178,10 +190,6 @@ public class Webhook implements Comparable<Webhook>, NamedType {
     @JsonIgnore
     ContentPath getStartingKey() {
         return startingKey;
-    }
-
-    String getEndItem() {
-        return endItem;
     }
 
     boolean allowedToChange(Webhook other) {
@@ -264,6 +272,10 @@ public class Webhook implements Comparable<Webhook>, NamedType {
         return this.name;
     }
 
+    public String getTag() {
+        return this.tag;
+    }
+
     public String getBatch() {
         return this.batch;
     }
@@ -288,6 +300,10 @@ public class Webhook implements Comparable<Webhook>, NamedType {
         return this.fastForwardable;
     }
 
+    public boolean isManagedByTag() {
+        return this.managedByTag;
+    }
+
     public boolean equals(Object o) {
         if (o == this) return true;
         if (!(o instanceof Webhook)) return false;
@@ -308,6 +324,9 @@ public class Webhook implements Comparable<Webhook>, NamedType {
         final Object this$name = this.getName();
         final Object other$name = other.getName();
         if (this$name == null ? other$name != null : !this$name.equals(other$name)) return false;
+        final Object this$tag = this.getTag();
+        final Object other$tag = other.getTag();
+        if (this$tag == null ? other$tag != null : !this$tag.equals(other$tag)) return false;
         final Object this$batch = this.getBatch();
         final Object other$batch = other.getBatch();
         if (this$batch == null ? other$batch != null : !this$batch.equals(other$batch)) return false;
@@ -325,9 +344,9 @@ public class Webhook implements Comparable<Webhook>, NamedType {
         final Object other$callbackTimeoutSeconds = other.getCallbackTimeoutSeconds();
         if (this$callbackTimeoutSeconds == null ? other$callbackTimeoutSeconds != null : !this$callbackTimeoutSeconds.equals(other$callbackTimeoutSeconds))
             return false;
-        final Object this$endItem = this.getEndItem();
-        final Object other$endItem = other.getEndItem();
-        if (this$endItem == null ? other$endItem != null : !this$endItem.equals(other$endItem))
+        final Object this$managedByTag = this.isManagedByTag();
+        final Object other$managedByTag = other.isManagedByTag();
+        if (this$managedByTag == null ? other$managedByTag != null : !this$managedByTag.equals(other$managedByTag))
             return false;
         return true;
     }
@@ -366,7 +385,6 @@ public class Webhook implements Comparable<Webhook>, NamedType {
                 + ", parallelCalls=" + this.getParallelCalls()
                 + ", name=" + this.getName()
                 + ", startingKey=" + this.getStartingKey()
-                + ", endItem=" + this.getEndItem()
                 + ", batch=" + this.getBatch()
                 + ", heartbeat=" + this.isHeartbeat()
                 + ", paused=" + this.isPaused()
@@ -376,43 +394,43 @@ public class Webhook implements Comparable<Webhook>, NamedType {
     }
 
     public Webhook withParallelCalls(Integer parallelCalls) {
-        return this.parallelCalls == parallelCalls ? this : new Webhook(this.callbackUrl, this.channelUrl, parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.endItem);
+        return this.parallelCalls == parallelCalls ? this : new Webhook(this.callbackUrl, this.channelUrl, parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.tag, this.managedByTag);
     }
 
     public Webhook withName(String name) {
-        return this.name == name ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, name, this.startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.endItem);
+        return this.name == name ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, name, this.startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.tag, this.managedByTag);
     }
 
     public Webhook withStartingKey(ContentPath startingKey) {
-        return this.startingKey == startingKey ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.endItem);
+        return this.startingKey == startingKey ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.tag, this.managedByTag);
     }
 
     public Webhook withBatch(String batch) {
-        return this.batch == batch ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.endItem);
+        return this.batch == batch ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.tag, this.managedByTag);
     }
 
     public Webhook withHeartbeat(boolean heartbeat) {
-        return this.heartbeat == heartbeat ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.endItem);
+        return this.heartbeat == heartbeat ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.tag, this.managedByTag);
     }
 
     public Webhook withPaused(boolean paused) {
-        return this.paused == paused ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.endItem);
+        return this.paused == paused ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, paused, this.ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.tag, this.managedByTag);
     }
 
     public Webhook withTtlMinutes(Integer ttlMinutes) {
-        return this.ttlMinutes == ttlMinutes ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, this.paused, ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.endItem);
+        return this.ttlMinutes == ttlMinutes ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, this.paused, ttlMinutes, this.maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.tag, this.managedByTag);
     }
 
     public Webhook withMaxWaitMinutes(Integer maxWaitMinutes) {
-        return this.maxWaitMinutes == maxWaitMinutes ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.endItem);
+        return this.maxWaitMinutes == maxWaitMinutes ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, maxWaitMinutes, this.callbackTimeoutSeconds, this.fastForwardable, this.tag, this.managedByTag);
     }
 
     public Webhook withCallbackTimeoutSeconds(Integer callbackTimeoutSeconds) {
-        return this.callbackTimeoutSeconds == callbackTimeoutSeconds ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, callbackTimeoutSeconds, this.fastForwardable, this.endItem);
+        return this.callbackTimeoutSeconds == callbackTimeoutSeconds ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, callbackTimeoutSeconds, this.fastForwardable, this.tag, this.managedByTag);
     }
 
     public Webhook withFastForwardable(boolean fastForwardable) {
-        return this.fastForwardable == fastForwardable ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, callbackTimeoutSeconds, this.fastForwardable, this.endItem);
+        return this.fastForwardable == fastForwardable ? this : new Webhook(this.callbackUrl, this.channelUrl, this.parallelCalls, this.name, this.startingKey, this.batch, this.heartbeat, this.paused, this.ttlMinutes, this.maxWaitMinutes, callbackTimeoutSeconds, this.fastForwardable, this.tag, this.managedByTag);
     }
 
     public static class WebhookBuilder {
@@ -421,7 +439,6 @@ public class Webhook implements Comparable<Webhook>, NamedType {
         private Integer parallelCalls;
         private String name;
         private ContentPath startingKey;
-        private String endItem;
         private String batch;
         private boolean heartbeat;
         private boolean paused;
@@ -429,6 +446,9 @@ public class Webhook implements Comparable<Webhook>, NamedType {
         private Integer maxWaitMinutes;
         private Integer callbackTimeoutSeconds;
         private boolean fastForwardable;
+        private String tag;
+        private boolean managedByTag;
+        private boolean isTagPrototype;
 
         WebhookBuilder() {
         }
@@ -453,13 +473,13 @@ public class Webhook implements Comparable<Webhook>, NamedType {
             return this;
         }
 
-        public Webhook.WebhookBuilder startingKey(ContentPath startingKey) {
-            this.startingKey = startingKey;
+        public Webhook.WebhookBuilder tag(String tag) {
+            this.tag = tag;
             return this;
         }
 
-        public Webhook.WebhookBuilder endItem(String endItem) {
-            this.endItem = endItem;
+        public Webhook.WebhookBuilder startingKey(ContentPath startingKey) {
+            this.startingKey = startingKey;
             return this;
         }
 
@@ -498,8 +518,18 @@ public class Webhook implements Comparable<Webhook>, NamedType {
             return this;
         }
 
+        public Webhook.WebhookBuilder managedByTag(boolean managedByTag) {
+            this.managedByTag = managedByTag;
+            return this;
+        }
+
+        public Webhook.WebhookBuilder isTagPrototype(boolean isTagPrototype) {
+            this.isTagPrototype = isTagPrototype;
+            return this;
+        }
+
         public Webhook build() {
-            return new Webhook(callbackUrl, channelUrl, parallelCalls, name, startingKey, batch, heartbeat, paused, ttlMinutes, maxWaitMinutes, callbackTimeoutSeconds, fastForwardable, endItem);
+            return new Webhook(callbackUrl, channelUrl, parallelCalls, name, startingKey, batch, heartbeat, paused, ttlMinutes, maxWaitMinutes, callbackTimeoutSeconds, fastForwardable, tag, managedByTag);
         }
 
         public String toString() {
@@ -507,8 +537,9 @@ public class Webhook implements Comparable<Webhook>, NamedType {
                     + ", channelUrl=" + this.channelUrl
                     + ", parallelCalls=" + this.parallelCalls
                     + ", name=" + this.name
+                    + ", tag=" + this.tag
+                    + ", managedByTag=" + this.managedByTag
                     + ", startingKey=" + this.startingKey
-                    + ", endItem=" + this.endItem
                     + ", batch=" + this.batch
                     + ", heartbeat=" + this.heartbeat
                     + ", paused=" + this.paused

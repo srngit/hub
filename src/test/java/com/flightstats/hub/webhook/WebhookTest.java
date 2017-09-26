@@ -27,6 +27,15 @@ public class WebhookTest {
     }
 
     @Test
+    public void testTag() throws Exception {
+        Webhook aWebhook = Webhook.builder()
+                .tag("allTheThings")
+                .callbackUrl("end").build();
+        Webhook webhook = Webhook.fromJson(aWebhook.toJson());
+        assertEquals("allTheThings", webhook.getTag());
+    }
+
+    @Test
     public void testWithName() throws Exception {
         Webhook webhook = this.webhook.withName("wither");
         webhook = Webhook.fromJson(webhook.toJson());
@@ -115,6 +124,8 @@ public class WebhookTest {
         assertEquals(withDefaultsA, withDefaultsB);
         Webhook withStartingKey = withDefaultsB.withStartingKey(new ContentKey());
         assertEquals(withDefaultsA, withStartingKey);
+        assertFalse(withDefaultsA.isChanged(withDefaultsA));
+        assertFalse(withDefaultsB.isChanged(withDefaultsB));
     }
 
 }
