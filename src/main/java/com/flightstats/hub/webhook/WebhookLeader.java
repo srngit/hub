@@ -78,8 +78,8 @@ class WebhookLeader implements Lockable {
             logger.info("not starting paused webhook " + webhook);
             return false;
         } else {
-            curatorLock = new CuratorLock(curator, zooKeeperState);
-            return curatorLock.runWithLock(this, getLeaderPath(), 1, TimeUnit.SECONDS);
+            curatorLock = new CuratorLock(curator, zooKeeperState, getLeaderPath());
+            return curatorLock.runWithLock(this, 1, TimeUnit.SECONDS);
         }
     }
 
@@ -288,11 +288,12 @@ class WebhookLeader implements Lockable {
             return;
         }
         String name = webhook.getName();
+        logger.info("stopExecutor " + name);
         try {
             executorService.shutdown();
-            logger.debug("awating termination " + name);
+            logger.info("awating termination " + name);
             executorService.awaitTermination(webhook.getCallbackTimeoutSeconds() + 10, TimeUnit.SECONDS);
-            logger.debug("stopped Executor " + name);
+            logger.info("stopped Executor " + name);
         } catch (InterruptedException e) {
             logger.warn("unable to stop?" + name, e);
         }
@@ -323,5 +324,9 @@ class WebhookLeader implements Lockable {
 
     public Webhook getWebhook() {
         return webhook;
+    }
+
+    boolean hasLeadership() {
+        return leadership.hasLeadership();
     }
 }

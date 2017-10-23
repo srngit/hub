@@ -76,7 +76,7 @@ public class WebhookService {
     public Optional<Webhook> upsertTagWebhook(Webhook webhook, Optional<Webhook> preExisting) {
         webhookDao.upsert(webhook);
         webhookManager.notifyWatchers(webhook);
-        TagWebhook.addTagWebhookInstances(webhook);
+        TagWebhook.upsertTagWebhookInstances(webhook);
         return preExisting;
     }
 
@@ -98,6 +98,9 @@ public class WebhookService {
 
     WebhookStatus getStatus(Webhook webhook) {
         WebhookStatus.WebhookStatusBuilder builder = WebhookStatus.builder().webhook(webhook);
+        if (webhook.isTagPrototype()) {
+            return builder.build();
+        }
         String channel = webhook.getChannelName();
         try {
             Optional<ContentKey> lastKey = channelService.getLatest(channel, true);
@@ -113,6 +116,7 @@ public class WebhookService {
 
     public void delete(String name) {
         logger.info("deleting webhook " + name);
+        TagWebhook.deleteInstancesIfTagWebhook(name);
         webhookDao.delete(name);
         webhookManager.delete(name);
     }

@@ -7,8 +7,7 @@ var tag = utils.randomTag();
 var webhookName = tag;
 var webhookConfig = {
     'callbackUrl': 'http://nothing/callback',
-    'channelUrl': hubUrlBase,
-    'tag': tag
+    'tagUrl': hubUrlBase + '/tag/' + tag
 };
 
 var channelName1 = utils.randomChannelName();
@@ -35,6 +34,7 @@ var verify = function (parse) {
 describe(testName, function () {
 
     utils.putWebhook(webhookName, webhookConfig, 201, testName);
+    utils.getWebhook(webhookName, webhookConfig, 200, verify);
 
     utils.createChannelWithConfig(channelName1, channel1);
     utils.createChannelWithConfig(channelName2, channel2);
@@ -46,10 +46,11 @@ describe(testName, function () {
     // //update the channel to remove tag (and as side effect remove it's tag webhook instance)
     var channel1noTag = {
         'name': channelName1,
-        'tags': [],
+        'tags': []
     }
+    utils.itMessages("expecting " + instance1 + " to be deleted due to removal of tag");
     utils.createChannelWithConfig(channelName1, channel1noTag);
-    utils.itSleeps(1000);
+    utils.itSleeps(10000);
     // the webhook associated with channelName1 should go away because of the removed tag
     utils.getWebhook(instance1, webhookConfig, 404);
 
