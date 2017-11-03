@@ -278,7 +278,7 @@ exports.putChannel = function putChannel(channelName, verify, body, description,
             function (err, response, body) {
                 expect(err).toBeNull();
                 expect(response.statusCode).toBe(expectedStatus);
-                console.log("respinse " + body);
+                console.log("response " + body);
                 verify(response, body);
                 done();
             });

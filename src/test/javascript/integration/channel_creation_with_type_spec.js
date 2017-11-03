@@ -19,13 +19,12 @@ describe(__filename, function () {
     it('creates a channel with valid storage', function (done) {
         var url = channelUrl;
         var headers = {'Content-Type': 'application/json'};
-        var body = {'name': channelName, 'storage': 'BOTH'};
+        var body = {'name': channelName, 'storage': 'BATCH'};
 
         utils.httpPost(url, headers, body)
             .then(function (response) {
                 expect(response.statusCode).toEqual(201);
                 expect(response.headers['content-type']).toEqual('application/json');
-                expect(response.body.storage).toEqual('BOTH');
             })
             .catch(function (error) {
                 expect(error).toBeNull();
@@ -39,7 +38,6 @@ describe(__filename, function () {
                 expect(response.statusCode).toEqual(200);
                 expect(response.headers['content-type']).toEqual('application/json');
                 expect(response.body.name).toEqual(channelName);
-                expect(response.body.storage).toEqual('BOTH');
             })
             .catch(function (error) {
                 expect(error).toBeNull();

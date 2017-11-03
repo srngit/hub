@@ -73,7 +73,7 @@ public class ChannelConfig implements Serializable, NamedType {
         }
 
         if (isBlank(storage)) {
-            this.storage = SINGLE;
+            this.storage = BATCH;
         } else {
             this.storage = StringUtils.upperCase(storage);
         }
@@ -199,7 +199,7 @@ public class ChannelConfig implements Serializable, NamedType {
     }
 
     public boolean isValidStorage() {
-        return storage.equals(SINGLE) || storage.equals(BATCH) || storage.equals(BOTH);
+        return storage.equals(BATCH);
     }
 
     public boolean isSingle() {

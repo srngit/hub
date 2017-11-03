@@ -132,7 +132,7 @@ public class ChannelValidator {
 
     private void validateStorage(ChannelConfig config) {
         if (!config.isValidStorage()) {
-            throw new InvalidRequestException("{\"error\": \"Valid storage values are SINGLE, BATCH and BOTH\"}");
+            throw new InvalidRequestException("{\"error\": \"Valid storage values are BATCH.  SINGLE and BOTH are deprecated\"}");
         }
     }
 
@@ -181,9 +181,6 @@ public class ChannelValidator {
                 if (oldConfig.getMutableTime().isBefore(request.getMutableTime())) {
                     throw new InvalidRequestException("{\"error\": \"mutableTime can not move forward. \"}");
                 }
-            }
-            if (!request.isSingle()) {
-                throw new InvalidRequestException("{\"error\": \"mutableTime is not compatable with BATCH storage. \"}");
             }
         }
         if (request.getMaxItems() > 5000) {

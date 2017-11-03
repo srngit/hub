@@ -248,9 +248,7 @@ public class ChannelValidatorTest {
 
     @Test
     public void testValidStorage() {
-        validator.validate(getBuilder().name("storage").storage(ChannelConfig.SINGLE).build(), null, false);
         validator.validate(getBuilder().name("storage").storage("batch").build(), null, false);
-        validator.validate(getBuilder().name("storage").storage("BoTh").build(), null, false);
     }
 
     @Test(expected = InvalidRequestException.class)
@@ -313,20 +311,6 @@ public class ChannelValidatorTest {
         validator.validate(getBuilder()
                 .name("global")
                 .global(globalConfig).build(), null, false);
-    }
-
-    @Test
-    public void testChangeStorageLoss() throws Exception {
-        HubProperties.setProperty("hub.protect.channels", "true");
-        ChannelConfig single = getBuilder().name("storage").storage(ChannelConfig.SINGLE).build();
-        ChannelConfig batch = getBuilder().name("storage").storage(ChannelConfig.BATCH).build();
-        ChannelConfig both = getBuilder().name("storage").storage(ChannelConfig.BOTH).build();
-        validator.validate(both, single, false);
-        validator.validate(both, batch, false);
-        validateError(single, both);
-        validateError(batch, both);
-        validateError(single, batch);
-        validateError(batch, single);
     }
 
     private ChannelConfig.ChannelConfigBuilder getBuilder() {

@@ -22,7 +22,6 @@ describe(testName, function () {
         expect(parse.ttlDays).toEqual(120);
         expect(parse.description).toEqual('');
         expect(parse.tags.length).toEqual(2);
-        expect(parse.storage).toEqual('SINGLE');
         expect(parse.protect).toEqual(false);
     }, {tags: ['one', 'two']});
 
@@ -35,7 +34,6 @@ describe(testName, function () {
 
     utils.putChannel(channelName, false, {protect: false}, 'protect', 403);
 
-    utils.putChannel(channelName, false, {storage: 'BATCH'}, 'storage Batch', 403);
     utils.putChannel(channelName, false, {tags: ['one']}, 'tag removal', 403);
     utils.putChannel(channelName, false, {ttlDays: 119}, 'ttlDays', 403);
     utils.putChannel(channelName, false, {owner: 'CBA'}, 'owner', 403);
@@ -44,9 +42,9 @@ describe(testName, function () {
         var parse = utils.parseJson(response, testName);
         expect(parse._links.self.href).toEqual(channelResource);
         expect(parse.tags.length).toEqual(3);
-        expect(parse.storage).toEqual('BOTH');
+        expect(parse.storage).toEqual('BATCH');
 
-    }, {storage: 'BOTH', tags: ['one', 'two', 'three']}, 'storage and tags', 201);
+    }, {storage: 'BATCH', tags: ['one', 'two', 'three']}, 'storage and tags', 201);
 
     it("deletes channel " + channelName, function (done) {
         request.del({url: channelResource},
