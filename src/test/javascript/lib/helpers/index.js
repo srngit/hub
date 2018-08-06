@@ -1,4 +1,6 @@
 const { fromObjectPath, getProp } = require('./functional');
+const { getHubDomain } = require('./network');
+const { keysToLowerCase, toLowerCase } = require('./formatters');
 const {
     randomChannelName,
     randomNumberBetweenInclusive,
@@ -19,6 +21,7 @@ module.exports = {
     createChannel,
     followRedirectIfPresent,
     fromObjectPath,
+    getHubDomain,
     getProp,
     getHubItem,
     hubClientDelete,
@@ -27,7 +30,9 @@ module.exports = {
     hubClientPost,
     hubClientPostTestItem,
     hubClientPut,
+    keysToLowerCase,
     randomChannelName,
     randomNumberBetweenInclusive,
     randomTagName,
+    toLowerCase,
 };

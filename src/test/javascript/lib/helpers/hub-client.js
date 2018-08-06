@@ -1,5 +1,6 @@
 const rp = require('request-promise-native');
 const { fromObjectPath, getProp } = require('./functional');
+const { keysToLowerCase } = require('./formatters');
 
 const isRedirect = statusCode => !!statusCode &&
     (statusCode >= 300 && statusCode <= 399);
@@ -26,7 +27,7 @@ const createChannel = async (channelName, url, description) => {
 };
 
 const hubClientDelete = async (url, headers = {}) => {
-    const formattedHeaders = utils.keysToLowerCase(headers);
+    const formattedHeaders = keysToLowerCase(headers);
     const options = {
         url,
         method: 'DELETE',
@@ -50,7 +51,7 @@ const hubClientDelete = async (url, headers = {}) => {
 };
 
 const hubClientUpdates = async (url, headers = {}, body = '', method) => {
-    const formattedHeaders = utils.keysToLowerCase(headers);
+    const formattedHeaders = keysToLowerCase(headers);
     const json = !!formattedHeaders['content-type'] &&
         !!formattedHeaders['content-type'].includes('json');
     const options = {
@@ -84,7 +85,7 @@ const hubClientUpdates = async (url, headers = {}, body = '', method) => {
 };
 
 const hubClientGet = async (url, headers = {}, isBinary) => {
-    const formattedHeaders = utils.keysToLowerCase(headers);
+    const formattedHeaders = keysToLowerCase(headers);
     const json = !!formattedHeaders['content-type'] &&
         !!formattedHeaders['content-type'].includes('json');
     const options = {

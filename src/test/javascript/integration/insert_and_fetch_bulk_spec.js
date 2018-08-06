@@ -1,12 +1,19 @@
-require('../integration_config');
+// require('../integration_config');
+const test = require('ava');
 const {
     fromObjectPath,
+    getHubDomain,
     getProp,
+    hubClientDelete,
+    hubClientGet,
+    hubClientPost,
     hubClientPut,
+    randomChannelName,
 } = require('../lib/helpers');
 
-const request = require('request');
-const channelName = utils.randomChannelName();
+const hubDomain = getHubDomain();
+const channelUrl = `http://${hubDomain}/channel`;
+const channelName = randomChannelName();
 const channelResource = `${channelUrl}/${channelName}/bulk`;
 const headers = { 'Content-Type': 'application/json' };
 const multipart = [
@@ -21,78 +28,73 @@ const multipart = [
     '{ "type" : "coffee", "roast" : "french" }\r\n',
     '--abcdefg--',
 ].join('');
-let items = [];
 
-describe(__filename, function () {
-    beforeAll(async () => {
-        const channelBody = { ttlDays: 1, tags: ['bulk'] };
-        const response = await hubClientPut(`${channelUrl}/${channelName}`, headers, channelBody);
-        expect(getProp('statusCode', response)).toEqual(201);
-    });
+test.before(async t => {
+    // create channel
+    const channelBody = JSON.stringify({ ttlDays: 1, tags: ['bulk'] });
+    const response = await hubClientPut(`${channelUrl}/${channelName}`, headers, channelBody);
+    t.is(getProp('statusCode', response), 201);
 
-    it(`bulk items to ${channelResource}`, function (done) {
-        request.post({
-            url: channelResource,
-            headers: {'Content-Type': "multipart/mixed; boundary=abcdefg"},
-            body: multipart,
-        },
-        function (err, response, body) {
-            expect(err).toBeNull();
-            expect(getProp('statusCode', response)).toBe(201);
-            const parse = utils.parseJson(response, __filename);
-            console.log(getProp('body', response));
-            const uris = fromObjectPath(['_links', 'uris'], parse) || [];
-            expect(uris.length).toBe(2);
-            items = uris;
-            done();
-        });
-    });
+    // post multipart item to channel bulk
+    const contentTypeMulti = { 'Content-Type': "multipart/mixed; boundary=abcdefg" };
+    const postResponse = await hubClientPost(channelResource, contentTypeMulti, multipart);
+    t.is(getProp('statusCode', postResponse), 201);
+    const body = getProp('body', postResponse);
+    // set the locations of the items on context
+    t.context.uris = fromObjectPath(['_links', 'uris'], body) || [];
+});
 
-    it(`gets first item ${channelResource}`, function (done) {
-        request.get({url: items[0]},
-            function (err, response, body) {
-                expect(err).toBeNull();
-                const contentType = fromObjectPath(['headers', 'content-type'], response);
-                expect(getProp('statusCode', response)).toBe(200);
-                expect(getProp('body', response)).toBe('<coffee><roast>french</roast><coffee>');
-                expect(contentType).toBe('application/xml');
-                done();
-            });
-    });
+test('get and verify first multipart item', async (t) => {
+    try {
+        const response = await hubClientGet(t.context.uris[0]);
+        t.is(getProp('statusCode', response), 200);
+        t.is(getProp('body', response), '<coffee><roast>french</roast><coffee>');
+        const contentType = fromObjectPath(['headers', 'content-type'], response);
+        t.is(contentType, 'application/xml');
+    } catch (ex) {
+        t.fail(ex);
+    }
+});
 
-    it(`gets second item ${channelResource}`, function (done) {
-        request.get({url: items[1]},
-            function (err, response, body) {
-                expect(err).toBeNull();
-                const contentType = fromObjectPath(['headers', 'content-type'], response);
-                expect(getProp('statusCode', response)).toBe(200);
-                expect(getProp('body', response)).toBe('{ "type" : "coffee", "roast" : "french" }');
-                expect(contentType).toBe('application/json');
-                done();
-            });
-    });
+test('get and verify second multipart item', async (t) => {
+    try {
+        const response = await hubClientGet(t.context.uris[1]);
+        t.is(getProp('statusCode', response), 200);
+        t.is(getProp('body', response), '{ "type" : "coffee", "roast" : "french" }');
+        const contentType = fromObjectPath(['headers', 'content-type'], response);
+        t.is(contentType, 'application/json');
+    } catch (ex) {
+        t.fail(ex);
+    }
+});
 
-    it(`calls previous ${channelResource}`, function (done) {
-        request.get({url: items[1] + '/previous?trace=true&stable=false', followRedirect: false},
-            function (err, response, body) {
-                expect(err).toBeNull();
-                const location = fromObjectPath(['headers', 'location'], response);
-                // console.log('response', response);
-                expect(getProp('statusCode', response)).toBe(303);
-                expect(location).toBe(items[0]);
-                done();
-            });
-    });
+test('get item from previous', async (t) => {
+    try {
+        const response = await hubClientGet(`${t.context.uris[1]}/previous?trace=true&stable=false'`);
+        const location = fromObjectPath(['headers', 'location'], response);
+        t.is(getProp('statusCode', response), 303);
+        t.is(location, t.context.uris[0]);
+    } catch (ex) {
+        t.fail(ex);
+    }
+});
 
-    it(`calls next ${channelResource}`, function (done) {
-        request.get({url: items[0] + '/next?trace=true&stable=false', followRedirect: false},
-            function (err, response, body) {
-                expect(err).toBeNull();
-                console.log('body', body);
-                const location = fromObjectPath(['headers', 'location'], response);
-                expect(getProp('statusCode', response)).toBe(303);
-                expect(location).toBe(items[1]);
-                done();
-            });
-    });
+test('get item from next', async (t) => {
+    try {
+        const response = await hubClientGet(`${t.context.uris[0]}/next?trace=true&stable=false'`);
+        const location = fromObjectPath(['headers', 'location'], response);
+        t.is(getProp('statusCode', response), 303);
+        t.is(location, t.context.uris[1]);
+    } catch (ex) {
+        t.fail(ex);
+    }
+});
+
+test.after.always(async (t) => {
+    try {
+        const response = await hubClientDelete(`${channelUrl}/${channelName}`);
+        t.is(getProp('statusCode', response), 202);
+    } catch (ex) {
+        t.fail(ex);
+    }
 });
