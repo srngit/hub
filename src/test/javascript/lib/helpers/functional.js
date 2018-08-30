@@ -58,7 +58,8 @@ const waitForCondition = async (conditionalFunc, timeout = 30000) => {
         const wait = setInterval(() => {
             time += 500;
             const timedOut = time >= timeout;
-            process.stdout.write('… … … … …');
+            process.stdout.write(' … … … … … ');
+            process.stdout.write(' °°°°°°°°° ');
             if (conditionalFunc() || timedOut) {
                 if (timedOut) console.log('<<<< ERROR IN waitForCondition TIMED OUT >>>>');
                 clearInterval(wait);

@@ -1,4 +1,3 @@
-require('../integration_config');
 const moment = require('moment');
 const { getHubUrlBase } = require('../lib/config');
 const {
