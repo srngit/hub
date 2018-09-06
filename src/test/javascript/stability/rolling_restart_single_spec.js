@@ -26,18 +26,12 @@ const {
     getChannelUrl,
 } = require('../lib/config');
 
-const {
-    RESTART_ZOOKEEPERS,
-} = process.env;
-
 const port = getCallBackPort();
 const channelName = randomChannelName();
 const webhookName = randomChannelName();
 const callbackDomain = getCallBackDomain();
 const callbackPath = `/${randomString(5)}`;
 const callbackUrl = `${callbackDomain}:${port}${callbackPath}`;
-const internalPath = `${getHubUrlBase()}/internal/properties`;
-// const { rollingRestartData: testData } = require('../path-to-static-data');
 const bigString = () => new Array(1000).fill(randomString(4)).join();
 const testData = () => new Array(100).fill(bigString());
 const channelResource = `${getChannelUrl()}/${channelName}`;
@@ -58,12 +52,6 @@ const channelBodyChange = {
     mutableTime: moment(mutableTime).subtract(10, 'minutes').format(timeFormat),
 };
 const headers = { 'Content-Type': 'application/json' };
-const getZookeepers = (body) => {
-    const properties = getProp('properties', body) || {};
-    const zks = properties['zookeeper.connection'];
-    return zks ? zks.split(',') : [];
-};
-
 const failIfNotReady = () => {
     if (!testContext[channelName].ready) {
         return fail('test configuration failed in before block');
@@ -75,24 +63,7 @@ describe('stability of webhook delivery during restart of the hub', () => {
         // make a call to the hub to clarify it is alive
         const response1 = await hubClientGet(`${getHubUrlBase()}/channel`);
         const stableStart = getProp('statusCode', response1) === 200;
-        // configure the test based on hub properties
-        // not necessary for single hub
-        // may not be the right path for clustered hub envs
-        // =============begin
-        const internal = hubClientGet(internalPath, headers);
-        const properties = getProp('body', internal) || {};
-        const isClustered = properties['hub.type'] === 'aws';
-        if (isClustered) {
-            const serversToRestart = getProp('servers', properties);
-            testContext[channelName].serversToRestart.push(...serversToRestart);
-            if (RESTART_ZOOKEEPERS) {
-                const zookeepers = getZookeepers(properties);
-                testContext[channelName].zookeepersToRestart.push(...zookeepers);
-            }
-        }
-        // =============end
-        // create a historical channel
-        // sets mutableTime
+        // create a channel
         const response2 = await hubClientPut(channelResource, headers, channelBody);
         const channelStart = getProp('statusCode', response2) === 201;
         // start a callback server
@@ -191,8 +162,9 @@ describe('stability of webhook delivery during restart of the hub', () => {
         }
         expect(hubId).toBeDefined();
         // use the id to restart the hub
+        const restartCMD = `docker restart ${hubId}`;
         try {
-            const { stdout, stderr } = await asyncExec(`docker restart ${hubId}`);
+            const { stdout, stderr } = await asyncExec(restartCMD);
             if (stderr) {
                 console.log('stderr', stderr);
                 expect(stderr).not.toBeDefined();
@@ -210,44 +182,6 @@ describe('stability of webhook delivery during restart of the hub', () => {
         testContext[channelName].calledBackBeforeRestart = callbackItemHistory.length;
     });
 
-    xit('triggers a rolling restart of the hub cluster', async () => {
-        // pseudo code for clustered hub, zk env
-        const restartCallback = async (error, stdout, stderr) => {
-            if (error) {
-                console.error(`exec error: ${error}`);
-                return null;
-            }
-            console.log(`stdout: ${stdout}`);
-            console.log(`stderr: ${stderr}`);
-            return stdout;
-        };
-        const {
-            serversToRestart,
-            zookeepersToRestart,
-        } = testContext[channelName];
-        for (const SERVER of serversToRestart) {
-            const restart = await exec('$HOME/restart_hub_docker.sh', {
-                env: {
-                    SERVER,
-                    ...process.env,
-                },
-            }, restartCallback);
-            expect(restart).toBeDefined();
-        }
-
-        if (RESTART_ZOOKEEPERS) {
-            for (const ZK_URL of zookeepersToRestart) {
-                const restart = await exec('$HOME/restart_zk_docker.sh', {
-                    env: {
-                        ZK_URL,
-                        ...process.env,
-                    },
-                }, restartCallback);
-                expect(restart).toBeDefined();
-            }
-        }
-    });
-
     it('waits for the hub to be back up', async () => {
         failIfNotReady();
         // poll the channel url for 50 seconds, check for 200
@@ -259,20 +193,6 @@ describe('stability of webhook delivery during restart of the hub', () => {
             const response = await hubClientGet(channelResource);
             statusCode = getProp('statusCode', response);
         } while (statusCode !== 200 && tries < 101);
-    });
-
-    xit('waits for all the callbacks to happen', async () => {
-        failIfNotReady();
-        const {
-            callbackItemHistory,
-            postedItemHistory,
-        } = testContext[channelName];
-        const condition = () => (
-            callbackItemHistory.length ===
-            postedItemHistory.length
-        );
-        await waitForCondition(condition);
-        console.log('callbacks made', callbackItemHistory.length);
     });
 
     it('verifies the number of items called back', async () => {
@@ -287,20 +207,6 @@ describe('stability of webhook delivery during restart of the hub', () => {
         );
         await waitForCondition(condition);
         console.log('callbacks made', callbackItemHistory.length);
-    });
-
-    xit('verifies callbacks that were made were made in proper historical order', () => {
-        failIfNotReady();
-        const {
-            callbackItemHistory,
-            postedItemHistory,
-        } = testContext[channelName];
-        const actual = postedItemHistory.every((data, index) => {
-            const same = callbackItemHistory[index] === data;
-            if (!same) console.log('not same', data, callbackItemHistory[index], index);
-            return same;
-        });
-        expect(actual).toBe(true);
     });
 
     it('verifies callbacks that were made were made in proper historical order', () => {

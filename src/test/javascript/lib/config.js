@@ -28,7 +28,8 @@ const getHubUrlBase = () => {
 
 const getChannelUrl = () => `${getHubUrlBase()}/channel`;
 
-const getCallBackDomain = () => `http://${getIp()}`;
+// const getCallBackDomain = () => `http://${getIp()}`;
+const getCallBackDomain = () => 'http://a93c0d3a.ngrok.io';
 
 console.log(`hubDomain:: ${getHubDomain()}`);
 // console.log(`runEncrypted:: ${getRunEncrypted()}`);
