@@ -39,7 +39,7 @@ const testContext = {
 };
 const timeFormat = 'YYYY-MM-DDTHH:mm:ss.SSS';
 const urlTimeFormat = 'YYYY/MM/DD/HH/mm/ss/SSS';
-const mutableTime = moment.utc().subtract(1, 'minute');
+const mutableTime = moment.utc();
 const stableMutableTime = moment.utc(mutableTime).subtract(30, 'minutes').format(timeFormat);
 const startItemTime = moment.utc(mutableTime).subtract(10, 'minutes');
 const historicalItemTime = moment.utc(mutableTime).subtract(10, 'seconds');
@@ -57,7 +57,7 @@ const pendingIfNotReady = () => {
     }
 };
 
-describe('stability of webhook delivery during restart of the hub', () => {
+describe('behavior of webhook in cluster, after mutableTime is moved back', () => {
     beforeAll(async () => {
         // make a call to the hub to clarify it is alive
         const response1 = await hubClientGet(`${getHubUrlBase()}/channel`);
