@@ -37,7 +37,7 @@ const channelName = randomChannelName();
 const webhookName = randomChannelName();
 const callbackDomain = getCallBackDomain();
 const callbackPath = `/${randomString(5)}`;
-const callbackUrl = `${callbackDomain}${callbackPath}`;
+const callbackUrl = `${callbackDomain}:${port}${callbackPath}`;
 // const internalPath = `${getHubUrlBase()}/internal/properties`;
 // const bigString = () => new Array(65536).fill(randomString(16)).join('');
 // const testData = () => new Array(600).fill(bigString());
