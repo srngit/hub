@@ -52,9 +52,9 @@ const channelBodyChange = {
     mutableTime: moment(mutableTime).subtract(10, 'minutes').format(timeFormat),
 };
 const headers = { 'Content-Type': 'application/json' };
-const failIfNotReady = () => {
+const pendingIfNotReady = () => {
     if (!testContext[channelName].ready) {
-        return fail('test configuration failed in before block');
+        return pending('test configuration failed in before block');
     }
 };
 
@@ -80,7 +80,7 @@ describe('stability of webhook delivery during restart of the hub', () => {
     });
 
     it('posts a start item', async () => {
-        failIfNotReady();
+        pendingIfNotReady();
         const beforeMutable = moment(mutableTime).subtract(4, 'minutes');
         const pointInThePastURL = `${channelResource}/${beforeMutable.format('YYYY/MM/DD/HH/mm/ss/SSS')}`;
         const response = await hubClientPostTestItem(pointInThePastURL, headers, testData());
@@ -94,7 +94,7 @@ describe('stability of webhook delivery during restart of the hub', () => {
     });
 
     it('post loads of data after mutableTime', async () => {
-        failIfNotReady();
+        pendingIfNotReady();
         for (const data of testData()) {
             const response = await hubClientPostTestItem(channelResource, headers, data);
             const item = fromObjectPath(['body', '_links', 'self', 'href'], response);
@@ -103,7 +103,7 @@ describe('stability of webhook delivery during restart of the hub', () => {
     });
 
     it('post loads of data before mutableTime', async () => {
-        failIfNotReady();
+        pendingIfNotReady();
         let millis = 1;
         for (const data of testData()) {
             millis += 10;
@@ -116,19 +116,19 @@ describe('stability of webhook delivery during restart of the hub', () => {
     });
 
     it('changes mutableTime to before earliest item', async () => {
-        failIfNotReady();
+        pendingIfNotReady();
         const response = await hubClientPut(channelResource, headers, channelBodyChange);
         expect(getProp('statusCode', response)).toEqual(201);
     });
 
     it('waits while the channel is refreshed', async () => {
-        failIfNotReady();
+        pendingIfNotReady();
         const response = await hubClientChannelRefresh();
         expect(getProp('statusCode', response)).toEqual(200);
     });
 
     it('creates a webhook pointing with startItem set to earliest posted', async () => {
-        failIfNotReady();
+        pendingIfNotReady();
         const url = `${getWebhookUrl()}/${webhookName}`;
         console.log('webhookUrl****', url);
         const body = {
@@ -142,7 +142,7 @@ describe('stability of webhook delivery during restart of the hub', () => {
     });
 
     it('triggers a restart of the single hub', async () => {
-        failIfNotReady();
+        pendingIfNotReady();
         // get docker's hub id
         const getHubIdCMD = 'docker ps --filter ancestor="flightstats/hub" --no-trunc --format "{{.ID}}"';
         let hubId = '';
@@ -183,7 +183,7 @@ describe('stability of webhook delivery during restart of the hub', () => {
     });
 
     it('waits for the hub to be back up', async () => {
-        failIfNotReady();
+        pendingIfNotReady();
         // poll the channel url for 50 seconds, check for 200
         let statusCode = 0;
         let tries = 0;
@@ -196,7 +196,7 @@ describe('stability of webhook delivery during restart of the hub', () => {
     });
 
     it('verifies the number of items called back', async () => {
-        failIfNotReady();
+        pendingIfNotReady();
         const {
             calledBackBeforeRestart,
             callbackItemHistory,
@@ -210,7 +210,7 @@ describe('stability of webhook delivery during restart of the hub', () => {
     });
 
     it('verifies callbacks that were made were made in proper historical order', () => {
-        failIfNotReady();
+        pendingIfNotReady();
         const {
             callbackItemHistory,
             calledBackBeforeRestart,
