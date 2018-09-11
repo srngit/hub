@@ -21,6 +21,7 @@ class DataDogMetricsService implements MetricsService {
     private final static Logger logger = LoggerFactory.getLogger(DataDogMetricsService.class);
     private final static StatsDClient statsd = DataDog.statsd;
     private final static ObjectMapper mapper = HubProvider.getInstance(ObjectMapper.class);
+    private final static List<String> tagsToIgnore = HubProperties.getDatadogTagsToIgnore();
 
     @Override
     public void insert(String channel, long start, Insert type, int items, long bytes) {
@@ -113,6 +114,7 @@ class DataDogMetricsService implements MetricsService {
     String[] addChannelTag(String channel, String... tags) {
         List<String> tagList = Arrays.stream(tags).collect(Collectors.toList());
         tagList.add("channel:" + channel);
+        tagList.addAll(tagsToIgnore);
         return tagList.toArray(new String[tagList.size()]);
     }
 

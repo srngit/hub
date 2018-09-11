@@ -11,7 +11,11 @@ import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class HubProperties {
     private final static Logger logger = LoggerFactory.getLogger(HubProperties.class);
@@ -29,6 +33,19 @@ public class HubProperties {
 
     public static boolean isAppEncrypted() {
         return HubProperties.getProperty("app.encrypted", false);
+    }
+
+    public static List<String> getDatadogTagsToIgnore() {
+        String rawTags = HubProperties.getProperty("data_dog.ignore_tags", "");
+        if (StringUtils.isEmpty(rawTags)) {
+            return Collections.emptyList();
+        } else {
+            String[] tags = rawTags.split(",");
+            return Stream.of(tags)
+                    .map(String::trim)
+                    .map(tag -> tag + ":")
+                    .collect(Collectors.toList());
+        }
     }
 
     public static int getSpokeTtlMinutes(SpokeStore spokeStore) {
