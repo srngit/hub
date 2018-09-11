@@ -3,7 +3,7 @@ const http = require('http');
 const https = require('https');
 const bodyParser = require('body-parser');
 const { readFileSync } = require('fs');
-const { fromObjectPath } = require('./functional');
+const { fromObjectPath, getProp } = require('./functional');
 const { getCallBackDomain } = require('../config');
 
 const creds = {
@@ -32,9 +32,7 @@ const startServer = async (port, callback, path = '/', secure, file) => {
     });
 
     server.on('request', function (request, response) {
-        if (file === '/home/integration/webhook_error_channel_spec.js') {
-            console.log('request.headers', request.headers);
-        }
+        console.log('request.headers', getProp('headers', request));
         request.on('end', function () {
             response.end();
         });

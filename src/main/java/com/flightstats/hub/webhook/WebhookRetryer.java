@@ -1,6 +1,7 @@
 package com.flightstats.hub.webhook;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.flightstats.hub.app.HubHost;
 import com.flightstats.hub.app.HubProperties;
 import com.flightstats.hub.app.HubProvider;
 import com.flightstats.hub.metrics.ActiveTraces;
@@ -102,6 +103,7 @@ class WebhookRetryer {
             ClientResponse response = null;
             try {
                 response = httpClient.resource(attempt.getWebhook().getCallbackUrl())
+                        .header("node", HubHost.getLocalHttpNameUri())
                         .type(MediaType.APPLICATION_JSON_TYPE)
                         .post(ClientResponse.class, payload);
                 attempt.setStatusCode(response.getStatus());
