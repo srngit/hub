@@ -1,8 +1,5 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const http = require('http');
-const { exec } = require('child_process');
-const { promisify } = require('util');
 const NodeSSH = require('node-ssh');
 
 const {
@@ -27,9 +24,7 @@ const {
     waitForCondition,
 } = require('../lib/helpers');
 
-const asyncExec = promisify(exec);
 const ssh = new NodeSSH();
-
 const port = getCallBackPort();
 const channelName = randomChannelName();
 const webhookName = randomChannelName();
@@ -62,7 +57,9 @@ const startServer = async (port, callback, path = '/', secure, file) => {
 
     app.post(path, async (request, response) => {
         const { handledKill } = testContext[channelName];
-        const node = fromObjectPath(['headers', 'node'], request);
+        const node = fromObjectPath(['headers', 'hub-node'], request) || '';
+        console.log('headers \n', getProp('headers', request));
+        console.log('NODE', node);
         const nodeName = node.replace('http://', '').replace(':8080', '');
         console.log('nodeName', nodeName);
         if (!handledKill) {
@@ -95,32 +92,27 @@ const startServer = async (port, callback, path = '/', secure, file) => {
                 const { stdout: stdout3, stderr: stderr3 } = await ssh.execCommand(`kill -SIGINT ${PROCESS_ID}`);
                 if (stdout3) console.log('stdout3', stdout3);
                 if (stderr3) console.log('stderr3', stderr3);
+                response.format({
+                    'default': () => {
+                        console.log(`this logger is here to demonstrate that the
+                        connection 200 ok is sent immed. after the above code SIGINTs the
+                        requesting server.        ^^^^^^^^^^^^`);
+                        response.status(200).end();
+                    },
+                });
             } catch (ex) {
+                response.status(400).end();
                 console.log('error', ex);
             }
         } else {
             const arr = fromObjectPath(['body', 'uris'], request) || [];
             const str = arr[arr.length - 1] || '';
             if (callback) callback(str);
+            response.status(200).end();
         }
     });
-
-    const server = new http.Server(app);
-
-    server.on('request', (request, response) => {
-        response.end();
-    });
-
-    server.on('connection', (socket) => {
-        socket.setTimeout(1000);
-    });
-
-    server.listen(port);
-    const listeningServer = await server.on('listening', () => {
-        console.log(`server listening at ${getCallBackDomain()}:${port}${path}`);
-        return server;
-    });
-    return listeningServer;
+    const server = app.listen(port, () => console.log(`app listening at ${callbackUrl}`));
+    return server;
 };
 
 describe(testName, () => {
@@ -175,6 +167,7 @@ describe(testName, () => {
     });
 
     it('waits for the callback', async () => {
+        pendingIfNotReady();
         const { firstItem, callbackItemHistory } = testContext[channelName];
         const condition = () => (callbackItemHistory.length && callbackItemHistory[0] === firstItem);
         await waitForCondition(condition);
